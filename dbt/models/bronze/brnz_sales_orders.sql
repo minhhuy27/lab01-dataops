@@ -6,11 +6,12 @@ with sales_order_header as (
         ShipDate as ship_date,
         Status as status,
         OnlineOrderFlag as online_order_flag,
-        SalesOrderNumber as sales_order_number,
-        PurchaseOrderNumber as purchase_order_number,
+        nullif(ltrim(rtrim(SalesOrderNumber)), '') as sales_order_number,
+        nullif(ltrim(rtrim(PurchaseOrderNumber)), '') as purchase_order_number,
         CustomerID as customer_id,
         SalesPersonID as sales_person_id,
-        TerritoryID as territory_id
+        TerritoryID as territory_id,
+        ModifiedDate as header_modified_date
     from {{ source('adventureworks', 'SalesOrderHeader') }}
 ),
 
@@ -22,7 +23,8 @@ sales_order_detail as (
         OrderQty as order_qty,
         UnitPrice as unit_price,
         UnitPriceDiscount as unit_price_discount,
-        LineTotal as line_total
+        LineTotal as line_total,
+        ModifiedDate as detail_modified_date
     from {{ source('adventureworks', 'SalesOrderDetail') }}
 )
 
@@ -43,7 +45,8 @@ select
     d.order_qty,
     d.unit_price,
     d.unit_price_discount,
-    d.line_total
+    d.line_total,
+    coalesce(d.detail_modified_date, h.header_modified_date) as last_modified_date
 from sales_order_header h
 left join sales_order_detail d
     on h.sales_order_id = d.sales_order_id 

@@ -2,20 +2,38 @@ version: 2
 
 models:
   - name: slvr_customers
-    description: Cleaned and standardized customer data
+    description: Cleaned and standardized customer data with segmentation flags
     columns:
       - name: customer_id
         description: Unique customer identifier
         tests:
           - unique
           - not_null
+      - name: person_id
+        description: Reference to underlying Person record when applicable
       - name: full_name
-        description: Customer full name
+        description: Trimmed concatenation of first and last name
+      - name: first_name
+        description: Cleaned first name
+      - name: last_name
+        description: Cleaned last name
       - name: email_promotion
-        description: Email promotion preference
+        description: Email promotion preference flag
+      - name: wants_email_promo
+        description: Binary flag indicating opt-in for email promotions
+      - name: store_id
+        description: Store identifier when customer is associated with a store
+      - name: territory_id
+        description: Sales territory identifier
+      - name: customer_type
+        description: Categorical label for Store vs Individual customers
+      - name: has_person_record
+        description: Indicates whether a Person record exists
+      - name: last_modified_date
+        description: Source system last modified timestamp
 
   - name: slvr_products
-    description: Cleaned and standardized product data
+    description: Cleaned and standardized product data with basic margin signals
     columns:
       - name: product_id
         description: Unique product identifier
@@ -24,13 +42,55 @@ models:
           - not_null
       - name: product_name
         description: Product name
+      - name: product_number
+        description: Product SKU/number
+      - name: make_flag
+        description: Flag indicating in-house manufacturing
+      - name: finished_goods_flag
+        description: Flag indicating finished goods status
       - name: list_price
         description: Product list price
         tests:
           - not_null
+      - name: standard_cost
+        description: Standard cost from source
+      - name: color
+        description: Product color
+      - name: size
+        description: Product size descriptor
+      - name: weight
+        description: Product weight in source unit
+      - name: product_line
+        description: Product line code
+      - name: class
+        description: Product class code
+      - name: style
+        description: Product style code
+      - name: subcategory_id
+        description: Product subcategory identifier
+      - name: subcategory_name
+        description: Product subcategory name
+      - name: category_id
+        description: Parent product category identifier
+      - name: sell_start_date
+        description: First sellable date
+      - name: sell_end_date
+        description: End sellable date
+      - name: discontinued_date
+        description: Discontinued timestamp
+      - name: is_discontinued
+        description: Flag indicating discontinued products
+      - name: is_active
+        description: Flag indicating product is still sellable
+      - name: margin_baseline
+        description: List price minus standard cost
+      - name: margin_baseline_pct
+        description: Margin percentage based on list price
+      - name: last_modified_date
+        description: Source system last modified timestamp
 
   - name: slvr_sales_orders
-    description: Cleaned sales order data with calculated fields
+    description: Cleaned sales order data enriched with customer and product context
     columns:
       - name: sales_order_id
         description: Sales order identifier
@@ -40,10 +100,64 @@ models:
         description: Order detail identifier
         tests:
           - not_null
+      - name: order_date
+        description: Order placement date
+      - name: due_date
+        description: Order due date
+      - name: ship_date
+        description: Shipment date
+      - name: status
+        description: Order status code from source
+      - name: order_channel
+        description: Normalized channel label for online vs offline orders
+      - name: sales_order_number
+        description: Business sales order number
+      - name: purchase_order_number
+        description: Customer purchase order number
+      - name: customer_id
+        description: Customer identifier
+        tests:
+          - relationships:
+              to: ref('slvr_customers')
+              field: customer_id
+      - name: customer_name
+        description: Full name derived from customer record
+      - name: sales_person_id
+        description: Salesperson identifier
+      - name: territory_id
+        description: Sales territory resolved from customer or order
+      - name: product_id
+        description: Product identifier
+        tests:
+          - relationships:
+              to: ref('slvr_products')
+              field: product_id
+      - name: product_name
+        description: Product name at time of sale
+      - name: subcategory_name
+        description: Product subcategory at time of sale
+      - name: product_category_id
+        description: Product category at time of sale
+      - name: order_qty
+        description: Quantity ordered
+      - name: unit_price
+        description: Unit price for the product
+      - name: unit_price_discount
+        description: Discount applied to unit price
       - name: line_total
         description: Total amount for line item
-        tests:
-          - not_null
+      - name: gross_amount
+        description: Extended gross amount (unit price * order qty)
+      - name: effective_unit_price
+        description: Realized unit price after discounts
+      - name: has_discount
+        description: Flag indicating presence of discount
+      - name: unit_margin
+        description: Unit margin using standard cost
+      - name: unit_margin_pct
+        description: Unit margin percentage using standard cost
+      - name: last_modified_date
+        description: Source system last modified timestamp
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:

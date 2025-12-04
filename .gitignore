@@ -1,0 +1,47 @@
+# Keep assignment brief local-only
+DATAOPS_PROJECT_REQUIREMENTS.md
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Python / virtualenv
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+
+# Secrets / env files
+.env
+*.env
+
+# dbt artifacts
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+dbt/.user.yml
+dbt/manifest.json
+dbt/run_results.json
+dbt/graph.gpickle
+
+# Airflow runtime
+airflow/logs/
+airflow/airflow.db
+airflow/*.pid
+airflow/*.sqlite
+airflow/__pycache__/
+
+# Database dumps/backups
+*.bak
+
+# General logs
+*.log

@@ -4,26 +4,41 @@ sources:
   - name: adventureworks
     database: AdventureWorks2014
     schema: Sales
+    freshness:
+      warn_after: {count: 1, period: day}
+      error_after: {count: 2, period: day}
     tables:
       - name: SalesOrderHeader
         description: Contains the sales order header information
+        loaded_at_field: ModifiedDate
       - name: SalesOrderDetail
         description: Contains the sales order detail line items
+        loaded_at_field: ModifiedDate
       - name: Customer
         description: Contains customer information
+        loaded_at_field: ModifiedDate
 
   - name: adventureworks_production
     database: AdventureWorks2014
     schema: Production
+    freshness:
+      warn_after: {count: 1, period: day}
+      error_after: {count: 2, period: day}
     tables:
       - name: Product
         description: Contains product information
+        loaded_at_field: ModifiedDate
       - name: ProductSubcategory
         description: Contains product subcategory information
+        loaded_at_field: ModifiedDate
 
   - name: adventureworks_person
     database: AdventureWorks2014
     schema: Person
+    freshness:
+      warn_after: {count: 1, period: day}
+      error_after: {count: 2, period: day}
     tables:
       - name: Person
-        description: Contains person information 
+        description: Contains person information
+        loaded_at_field: ModifiedDate 

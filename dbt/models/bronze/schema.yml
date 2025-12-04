@@ -1,6 +1,88 @@
 version: 2
 
 models:
+  - name: brnz_customers
+    description: Staging view of AdventureWorks customers enriched with person attributes
+    columns:
+      - name: customer_id
+        description: Unique customer identifier from Sales.Customer
+        tests:
+          - not_null
+          - unique
+      - name: person_id
+        description: Reference to Person.BusinessEntityID when the customer is an individual
+      - name: first_name
+        description: Trimmed first name from Person.Person
+      - name: last_name
+        description: Trimmed last name from Person.Person
+      - name: email_promotion
+        description: Email promotion preference flag
+      - name: store_id
+        description: Store identifier for store-associated customers
+      - name: territory_id
+        description: Sales territory identifier
+      - name: last_modified_date
+        description: Source system last modified timestamp
+
+  - name: brnz_products
+    description: Staging view of products with subcategory details and standardized attributes
+    columns:
+      - name: product_id
+        description: Unique product identifier from Production.Product
+        tests:
+          - not_null
+          - unique
+      - name: product_name
+        description: Trimmed product name
+      - name: product_number
+        description: Source product number/SKU
+      - name: make_flag
+        description: Flag indicating in-house manufacturing
+      - name: finished_goods_flag
+        description: Flag indicating finished goods status
+      - name: color
+        description: Standardized color value
+      - name: safety_stock_level
+        description: Minimum inventory level before reorder
+      - name: reorder_point
+        description: Inventory level that triggers reorder
+      - name: standard_cost
+        description: Standard unit cost
+      - name: list_price
+        description: List price of the product
+      - name: size
+        description: Product size attribute
+      - name: size_unit_measure_code
+        description: Size unit of measure code
+      - name: weight_unit_measure_code
+        description: Weight unit of measure code
+      - name: weight
+        description: Product weight
+      - name: days_to_manufacture
+        description: Days required to manufacture the product
+      - name: product_line
+        description: Product line code
+      - name: class
+        description: Product class code
+      - name: style
+        description: Product style code
+      - name: product_subcategory_id
+        description: Foreign key to ProductSubcategory
+      - name: product_model_id
+        description: Foreign key to ProductModel
+      - name: sell_start_date
+        description: Date when the product became available for sale
+      - name: sell_end_date
+        description: Date when the product stopped selling
+      - name: discontinued_date
+        description: Date when the product was discontinued
+      - name: subcategory_name
+        description: Product subcategory name from Production.ProductSubcategory
+      - name: product_category_id
+        description: Parent product category identifier
+      - name: last_modified_date
+        description: Source system last modified timestamp
+
   - name: brnz_sales_orders
     description: Staging model combining sales order headers and details
     columns:
@@ -42,6 +124,8 @@ models:
         description: Discount amount
       - name: line_total
         description: Total amount for this line item
+      - name: last_modified_date
+        description: Last modified timestamp from source rows
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:

@@ -6,7 +6,7 @@
   USE [AdventureWorks2014];
   EXEC('create view 
 
-    [dbt_test__audit.testview_148c6a75e63858463ea2cb5c71e062ae]
+    [dbt_test__audit.testview_598bfde396428f38732b0b962bced4f3]
    as 
     
     
@@ -31,12 +31,12 @@ having count(*) > 1
   from (
     select  * from 
 
-    [dbt_test__audit.testview_148c6a75e63858463ea2cb5c71e062ae]
+    [dbt_test__audit.testview_598bfde396428f38732b0b962bced4f3]
   
   ) dbt_internal_test;
 
   USE [AdventureWorks2014];
   EXEC('drop view 
 
-    [dbt_test__audit.testview_148c6a75e63858463ea2cb5c71e062ae]
+    [dbt_test__audit.testview_598bfde396428f38732b0b962bced4f3]
   ;')

@@ -4,12 +4,12 @@ dbt_airflow_project:
     dev:
       type: sqlserver
       driver: 'ODBC Driver 17 for SQL Server'
-      server: host.docker.internal
+      server: sqlserver  # use service name on docker network
       port: 1433
       database: AdventureWorks2014
       schema: dbo
-      user: imrandbtnew
-      password: 'Imran@12345'
+      user: SA
+      password: 'YourStrong@Passw0rd'
       windows_login: False
       encrypt: False
       trust_cert: True
