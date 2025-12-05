@@ -104,12 +104,24 @@ models:
         description: Order placement date
       - name: due_date
         description: Order due date
+        tests:
+          - after_or_equal:
+              compare_column: order_date
       - name: ship_date
         description: Shipment date
+        tests:
+          - after_or_equal:
+              compare_column: order_date
       - name: status
         description: Order status code from source
+        tests:
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6]
       - name: order_channel
         description: Normalized channel label for online vs offline orders
+        tests:
+          - accepted_values:
+              values: ['Online', 'Offline']
       - name: sales_order_number
         description: Business sales order number
       - name: purchase_order_number
@@ -140,10 +152,16 @@ models:
         description: Product category at time of sale
       - name: order_qty
         description: Quantity ordered
+        tests:
+          - positive
       - name: unit_price
         description: Unit price for the product
+        tests:
+          - positive
       - name: unit_price_discount
         description: Discount applied to unit price
+        tests:
+          - between_zero_one
       - name: line_total
         description: Total amount for line item
       - name: gross_amount

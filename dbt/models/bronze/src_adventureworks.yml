@@ -7,6 +7,8 @@ sources:
     freshness:
       warn_after: {count: 1, period: day}
       error_after: {count: 2, period: day}
+    meta:
+      expected_latency_hours: 24
     tables:
       - name: SalesOrderHeader
         description: Contains the sales order header information
@@ -24,6 +26,8 @@ sources:
     freshness:
       warn_after: {count: 1, period: day}
       error_after: {count: 2, period: day}
+    meta:
+      expected_latency_hours: 24
     tables:
       - name: Product
         description: Contains product information
@@ -38,6 +42,8 @@ sources:
     freshness:
       warn_after: {count: 1, period: day}
       error_after: {count: 2, period: day}
+    meta:
+      expected_latency_hours: 24
     tables:
       - name: Person
         description: Contains person information
