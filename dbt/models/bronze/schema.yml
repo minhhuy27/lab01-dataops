@@ -110,12 +110,20 @@ models:
         description: Customer purchase order number
       - name: customer_id
         description: Foreign key reference to customer
+        tests:
+          - relationships:
+              to: ref('brnz_customers')
+              field: customer_id
       - name: sales_person_id
         description: ID of the sales person
       - name: territory_id
         description: Sales territory ID
       - name: product_id
         description: Foreign key reference to product
+        tests:
+          - relationships:
+              to: ref('brnz_products')
+              field: product_id
       - name: order_qty
         description: Quantity ordered
       - name: unit_price
