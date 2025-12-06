@@ -1,13 +1,8 @@
 [sqlfluff]
 dialect = tsql
-templater = dbt
-exclude_rules = L009
-
-[sqlfluff:templater:dbt]
-project_dir = dbt
-
-[sqlfluff:rules]
+templater = jinja
 max_line_length = 120
+exclude_rules = L009
 
 [sqlfluff:indentation]
 tab_space_size = 4
