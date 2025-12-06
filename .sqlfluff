@@ -2,7 +2,7 @@
 dialect = tsql
 templater = jinja
 max_line_length = 120
-exclude_rules = L009,CP02,ST06,AL01,AL03,AL09,ST03,ST01,LT01,LT02,LT05,RF01,PRS
+exclude_rules = L009,CP02,ST06,AL01,AL03,AL09,ST03,ST01,LT01,LT02,LT05,RF01
 
 [sqlfluff:indentation]
 tab_space_size = 4
