@@ -11,10 +11,10 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
-target-path: "target"
+target-path: "/tmp/dbt_target"
 clean-targets:
-  - "target"
-  - "dbt_packages"
+  - "/tmp/dbt_target"
+  - "/tmp/dbt_packages"
 
 models:
   dbt_sqlserver_project:
@@ -27,3 +27,5 @@ models:
     gold:
       +materialized: table 
       +schema: gold
+
+packages-install-path: "/tmp/dbt_packages"
