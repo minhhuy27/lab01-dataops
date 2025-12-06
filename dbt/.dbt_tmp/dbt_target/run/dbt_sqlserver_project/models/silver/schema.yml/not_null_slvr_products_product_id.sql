@@ -1,0 +1,39 @@
+
+  
+  
+
+  
+  USE [AdventureWorks2014];
+  EXEC('create view 
+
+    [dbt_test__audit.testview_0ed0f88d0f5c38e6707f589c75dfeb07]
+   as 
+    
+    
+
+
+
+select product_id
+from "AdventureWorks2014"."silver"."slvr_products"
+where product_id is null
+
+
+;')
+  select
+    count(*) as failures,
+    case when count(*) != 0
+      then 'true' else 'false' end as should_warn,
+    case when count(*) != 0
+      then 'true' else 'false' end as should_error
+  from (
+    select  * from 
+
+    [dbt_test__audit.testview_0ed0f88d0f5c38e6707f589c75dfeb07]
+  
+  ) dbt_internal_test;
+
+  USE [AdventureWorks2014];
+  EXEC('drop view 
+
+    [dbt_test__audit.testview_0ed0f88d0f5c38e6707f589c75dfeb07]
+  ;')

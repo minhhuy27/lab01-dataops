@@ -14,7 +14,9 @@ snapshot-paths: ["snapshots"]
 target-path: "/tmp/dbt_target"
 clean-targets:
   - "/tmp/dbt_target"
-  - "/tmp/dbt_packages"
+  - "/tmp/dbt_packages_cache"
+
+packages-install-path: "/tmp/dbt_packages_cache"
 
 models:
   dbt_sqlserver_project:
@@ -27,5 +29,3 @@ models:
     gold:
       +materialized: table 
       +schema: gold
-
-packages-install-path: "/tmp/dbt_packages"

@@ -41,6 +41,8 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - DBT_PACKAGES_INSTALL_PATH=/tmp/dbt_packages_cache
+      - DBT_TARGET_PATH=/tmp/dbt_target
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -64,6 +66,8 @@ services:
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
+      - DBT_PACKAGES_INSTALL_PATH=/tmp/dbt_packages_cache
+      - DBT_TARGET_PATH=/tmp/dbt_target
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
@@ -80,6 +84,9 @@ services:
       dockerfile: Dockerfile
     depends_on:
       - sqlserver
+    environment:
+      - DBT_PACKAGES_INSTALL_PATH=/tmp/dbt_packages_cache
+      - DBT_TARGET_PATH=/tmp/dbt_target
     volumes:
       - ./dbt:/usr/app/dbt
     command: tail -f /dev/null  # Keep container running
