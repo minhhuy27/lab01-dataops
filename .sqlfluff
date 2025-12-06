@@ -1,0 +1,13 @@
+[sqlfluff]
+dialect = tsql
+templater = dbt
+exclude_rules = L009
+
+[sqlfluff:templater:dbt]
+project_dir = dbt
+
+[sqlfluff:rules]
+max_line_length = 120
+
+[sqlfluff:indentation]
+tab_space_size = 4

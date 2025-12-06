@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["*", "**"]
+  push:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    env:
+      DBT_PROFILES_DIR: dbt
+      DBT_PACKAGES_INSTALL_PATH: /tmp/dbt_packages_cache
+      DBT_TARGET_PATH: /tmp/dbt_target
+      DBT_SQLSERVER_HOST: localhost
+      DBT_SQLSERVER_USER: SA
+      DBT_SQLSERVER_PASSWORD: YourStrong@Passw0rd
+      DBT_SQLSERVER_DATABASE: AdventureWorks2014
+      DBT_SQLSERVER_SCHEMA: dbo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install system dependencies (ODBC for SQL Server)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl apt-transport-https ca-certificates unixodbc unixodbc-dev
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /etc/apt/keyrings/microsoft.gpg
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/20.04/prod focal main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            dbt-core==1.8.7 \
+            dbt-sqlserver==1.8.7 \
+            black==23.12.1 \
+            flake8==6.1.0 \
+            sqlfluff==3.0.5 \
+            sqlfluff-templater-dbt==3.0.5
+
+      - name: Validate PR title (conventional commits)
+        if: github.event_name == 'pull_request'
+        run: |
+          title="${{ github.event.pull_request.title }}"
+          if [[ ! "$title" =~ ^(feat|fix|chore|docs|test|ci|build|refactor|perf|revert):\  ]]; then
+            echo "PR title phải theo dạng conventional commits, ví dụ: feat: add feature"
+            exit 1
+          fi
+
+      - name: Check large files (>1MB) in diff
+        run: |
+          base_ref="${{ github.base_ref }}"
+          if [ -n "$base_ref" ]; then
+            git fetch origin "$base_ref" --depth=1 || true
+            diff_files=$(git diff --name-only "origin/$base_ref"...)
+          else
+            diff_files=$(git diff --name-only HEAD~1)
+          fi
+          max_size=$((1024*1024))
+          for f in $diff_files; do
+            if [ -f "$f" ]; then
+              size=$(stat -c%s "$f")
+              if [ "$size" -gt "$max_size" ]; then
+                echo "::error file=$f::File size $size bytes > 1MB"
+                exit 1
+              fi
+            fi
+          done
+
+      - name: Check conflict markers
+        run: |
+          if rg --hidden --glob '!**/.git/**' '^(<{7}|={7}|>{7})'; then
+            echo "Conflict markers detected."
+            exit 1
+          fi
+
+      - name: Lint Python (black, flake8)
+        run: |
+          black --check .
+          flake8 .
+
+      - name: Lint SQL (sqlfluff)
+        run: sqlfluff lint dbt/models --config .sqlfluff
+
+      - name: Bring up SQL Server for dbt
+        run: |
+          docker compose -f docker-compose.yml up -d sqlserver
+          # wait for SQL Server
+          sleep 40
+          docker compose exec sqlserver bash -c "chmod +x /tmp/restore_db.sh && /tmp/restore_db.sh" || true
+          sleep 20
+
+      - name: dbt deps
+        run: |
+          mkdir -p "$DBT_PACKAGES_INSTALL_PATH" "$DBT_TARGET_PATH"
+          dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: dbt compile
+        run: dbt compile --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+
+      - name: dbt test
+        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+
+      - name: Generate dbt docs
+        run: dbt docs generate --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --docs-directory /tmp/dbt_docs
+
+      - name: Upload dbt docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-docs
+          path: /tmp/dbt_docs

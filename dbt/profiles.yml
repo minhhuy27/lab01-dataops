@@ -4,12 +4,12 @@ dbt_airflow_project:
     dev:
       type: sqlserver
       driver: 'ODBC Driver 17 for SQL Server'
-      server: sqlserver  # use service name on docker network
+      server: "{{ env_var('DBT_SQLSERVER_HOST', 'sqlserver') }}"  # override in CI: localhost
       port: 1433
-      database: AdventureWorks2014
-      schema: dbo
-      user: SA
-      password: 'YourStrong@Passw0rd'
+      database: "{{ env_var('DBT_SQLSERVER_DATABASE', 'AdventureWorks2014') }}"
+      schema: "{{ env_var('DBT_SQLSERVER_SCHEMA', 'dbo') }}"
+      user: "{{ env_var('DBT_SQLSERVER_USER', 'SA') }}"
+      password: "{{ env_var('DBT_SQLSERVER_PASSWORD', 'YourStrong@Passw0rd') }}"
       windows_login: False
       encrypt: False
       trust_cert: True
