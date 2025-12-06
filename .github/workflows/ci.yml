@@ -39,12 +39,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release unixodbc unixodbc-dev
-          sudo mkdir -p /etc/apt/keyrings
+          # Use a single keyring path to avoid Signed-By conflicts on GitHub runners
+          KEYRING=/usr/share/keyrings/microsoft-prod.gpg
+          sudo mkdir -p "$(dirname "$KEYRING")"
+          sudo rm -f /etc/apt/sources.list.d/mssql-release.list
           sudo rm -f /etc/apt/keyrings/microsoft.gpg
-          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor --batch --yes --output /etc/apt/keyrings/microsoft.gpg
+          if [ ! -f "$KEYRING" ]; then
+            curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor --batch --yes --output "$KEYRING"
+          fi
           DISTRO=$(lsb_release -rs)          # e.g., 22.04 on GitHub runners
           CODENAME=$(lsb_release -cs)        # e.g., jammy
-          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/ubuntu/${DISTRO}/prod ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          echo "deb [arch=amd64 signed-by=${KEYRING}] https://packages.microsoft.com/ubuntu/${DISTRO}/prod ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
           sudo apt-get update
           sudo ACCEPT_EULA=Y DEBIAN_FRONTEND=noninteractive apt-get install -y msodbcsql18
 
