@@ -8,7 +8,17 @@ from airflow.operators.bash import BashOperator
 
 DBT_ROOT = "/opt/airflow/dbt"
 DBT_BIN = "/home/airflow/.local/bin/dbt"
-DEFAULT_PATH = "/home/airflow/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+DEFAULT_PATH = ":".join(
+    [
+        "/home/airflow/.local/bin",
+        "/usr/local/sbin",
+        "/usr/local/bin",
+        "/usr/sbin",
+        "/usr/bin",
+        "/sbin",
+        "/bin",
+    ]
+)
 DBT_PACKAGES_PATH = "/tmp/dbt_packages_cache"
 DBT_TARGET_PATH = "/tmp/dbt_target"
 DEFAULT_ENV = {
@@ -18,6 +28,10 @@ DEFAULT_ENV = {
     "DBT_PACKAGES_INSTALL_PATH": DBT_PACKAGES_PATH,
     "DBT_TARGET_PATH": DBT_TARGET_PATH,
 }
+CMD_PREFIX = (
+    f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
+    f"cd {DBT_ROOT} && "
+)
 
 
 def notify_failure(context):
@@ -67,51 +81,39 @@ with DAG(
 ) as dag:
     dbt_deps = BashOperator(
         task_id="dbt_deps",
-        bash_command=(
-            f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
-            f"cd {DBT_ROOT} && "
-            f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} deps"
-        ),
+        bash_command=CMD_PREFIX
+        + f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} deps",
         env=DEFAULT_ENV,
     )
 
     dbt_run_bronze = BashOperator(
         task_id="dbt_run_bronze",
-        bash_command=(
-            f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
-            f"cd {DBT_ROOT} && "
-            f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} run --select path:models/bronze"
-        ),
+        bash_command=CMD_PREFIX
+        + f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} "
+        + "run --select path:models/bronze",
         env=DEFAULT_ENV,
     )
 
     dbt_run_silver = BashOperator(
         task_id="dbt_run_silver",
-        bash_command=(
-            f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
-            f"cd {DBT_ROOT} && "
-            f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} run --select path:models/silver"
-        ),
+        bash_command=CMD_PREFIX
+        + f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} "
+        + "run --select path:models/silver",
         env=DEFAULT_ENV,
     )
 
     dbt_run_gold = BashOperator(
         task_id="dbt_run_gold",
-        bash_command=(
-            f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
-            f"cd {DBT_ROOT} && "
-            f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} run --select path:models/gold"
-        ),
+        bash_command=CMD_PREFIX
+        + f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} "
+        + "run --select path:models/gold",
         env=DEFAULT_ENV,
     )
 
     dbt_test = BashOperator(
         task_id="dbt_test",
-        bash_command=(
-            f"mkdir -p /tmp/dbt_logs {DBT_PACKAGES_PATH} {DBT_TARGET_PATH} && "
-            f"cd {DBT_ROOT} && "
-            f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} test"
-        ),
+        bash_command=CMD_PREFIX
+        + f"DBT_PACKAGES_INSTALL_PATH={DBT_PACKAGES_PATH} {DBT_BIN} test",
         env=DEFAULT_ENV,
     )
 
