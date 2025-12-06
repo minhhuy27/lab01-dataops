@@ -1,14 +1,10 @@
-"""
-DAG điều phối DBT: chạy tuần tự bronze -> silver -> gold và kiểm thử.
-Lịch: hàng ngày (0h), có retry và callback khi lỗi.
-"""
+"""DAG orchestration for DBT: bronze -> silver -> gold with tests."""
 
 from datetime import datetime, timedelta
 import logging
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
-
 
 DBT_ROOT = "/opt/airflow/dbt"
 DBT_BIN = "/home/airflow/.local/bin/dbt"
@@ -28,7 +24,12 @@ def notify_failure(context):
     task_id = context.get("task_instance").task_id
     dag_id = context.get("dag").dag_id
     execution_date = context.get("execution_date")
-    logging.error("DBT DAG thất bại tại task=%s, dag=%s, execution=%s", task_id, dag_id, execution_date)
+    logging.error(
+        "DBT DAG failed at task=%s, dag=%s, execution=%s",
+        task_id,
+        dag_id,
+        execution_date,
+    )
 
 
 default_args = {
@@ -43,20 +44,20 @@ default_args = {
 
 
 doc_md = """
-## Mục tiêu
-- Chạy DBT theo thứ tự layer: bronze → silver → gold.
-- Kiểm thử dữ liệu sau khi chạy (dbt test).
-- Có retry, log lỗi qua callback.
+## Purpose
+- Run DBT by layer: bronze -> silver -> gold.
+- Validate data with dbt test.
+- Include retry and error logging via callback.
 
-## Mặc định
-- Lịch: `0 0 * * *` (hàng ngày, không catchup).
-- DBT chạy trong container Airflow tại `/opt/airflow/dbt`.
+## Defaults
+- Schedule: `0 0 * * *` (daily, no catchup).
+- DBT runs inside Airflow container at `/opt/airflow/dbt`.
 """
 
 with DAG(
     dag_id="dbt_pipeline",
     default_args=default_args,
-    description="Orchestrate DBT models theo layer và kiểm thử dữ liệu",
+    description="Orchestrate DBT models by layer and run tests",
     schedule_interval="0 0 * * *",
     start_date=datetime(2024, 1, 1),
     catchup=False,
@@ -64,7 +65,6 @@ with DAG(
     tags=["dbt", "sqlserver", "dataops"],
     doc_md=doc_md,
 ) as dag:
-
     dbt_deps = BashOperator(
         task_id="dbt_deps",
         bash_command=(
