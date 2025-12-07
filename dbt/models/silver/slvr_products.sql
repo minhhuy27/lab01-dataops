@@ -21,7 +21,7 @@ cleaned as (
         coalesce(size, 'N/A') as size,
         coalesce(weight, 0) as weight,
         product_line,
-        class,
+        product_class,
         style,
         product_subcategory_id as subcategory_id,
         coalesce(subcategory_name, 'Uncategorized') as subcategory_name,
