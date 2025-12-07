@@ -142,7 +142,7 @@ jobs:
             const status = '${{ job.status }}';
             const target = '${{ steps.env_target.outputs.target_name }}';
             const body = `CD ${status} (target=${target}) on ${context.ref}\nLogs: dbt-logs`;
-            await github.repos.createCommitComment({
+            await github.rest.repos.createCommitComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha,
