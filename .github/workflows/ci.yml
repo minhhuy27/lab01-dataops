@@ -110,10 +110,24 @@ jobs:
       - name: Bring up SQL Server for dbt
         run: |
           docker compose -f docker-compose.yml up -d sqlserver
-          # wait for SQL Server
-          sleep 40
-          docker compose exec sqlserver bash -c "chmod +x /tmp/restore_db.sh && /tmp/restore_db.sh" || true
-          sleep 20
+          # wait for SQL Server to accept connections
+          for i in {1..30}; do
+            if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "select 1" >/dev/null 2>&1; then
+              echo "SQL Server is up"; break
+            fi
+            echo "Waiting for SQL Server... ($i)"
+            sleep 5
+          done
+          # restore DB if missing
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "IF DB_ID('AdventureWorks2014') IS NULL RESTORE DATABASE AdventureWorks2014 FROM DISK = '/tmp/AdventureWorks2014.bak' WITH MOVE 'AdventureWorks2014_Data' TO '/var/opt/mssql/data/AdventureWorks2014.mdf', MOVE 'AdventureWorks2014_Log' TO '/var/opt/mssql/data/AdventureWorks2014_log.ldf'"
+          # ensure DB is online
+          for i in {1..24}; do
+            if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT state_desc FROM sys.databases WHERE name='AdventureWorks2014'" | grep -q ONLINE; then
+              echo "AdventureWorks2014 is online"; break
+            fi
+            echo "Waiting for AdventureWorks2014 to come online... ($i)"
+            sleep 5
+          done
 
       - name: dbt deps
         run: |
