@@ -1,0 +1,94 @@
+name: CD
+
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DBT_PROFILES_DIR: dbt
+      DBT_PACKAGES_INSTALL_PATH: /tmp/dbt_packages_cache
+      DBT_TARGET_PATH: /tmp/dbt_target
+      DBT_LOG_PATH: /tmp/dbt_logs
+      DBT_SQLSERVER_HOST: localhost
+      DBT_SQLSERVER_USER: SA
+      DBT_SQLSERVER_PASSWORD: YourStrong@Passw0rd
+      DBT_SQLSERVER_DATABASE: AdventureWorks2014
+      DBT_SQLSERVER_SCHEMA: dbo
+      DBT_SQLSERVER_DRIVER: "ODBC Driver 18 for SQL Server"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+
+      - name: Install system dependencies (ODBC for SQL Server)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release unixodbc unixodbc-dev
+          KEYRING=/usr/share/keyrings/microsoft-prod.gpg
+          sudo mkdir -p "$(dirname "$KEYRING")" /etc/apt/sources.list.d
+          sudo rm -f /etc/apt/sources.list.d/mssql-release.list
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor --batch --yes -o "$KEYRING"
+          # Pin to Debian 11 repo for driver 18
+          echo "deb [arch=amd64 signed-by=${KEYRING}] https://packages.microsoft.com/debian/11/prod bullseye main" | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y DEBIAN_FRONTEND=noninteractive apt-get install -y msodbcsql18
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install dbt-core==1.8.7 dbt-sqlserver==1.8.7
+
+      - name: Bring up SQL Server for dbt
+        run: |
+          docker compose -f docker-compose.yml up -d sqlserver
+          # wait for SQL Server to accept connections
+          for i in {1..30}; do
+            if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "select 1" >/dev/null 2>&1; then
+              echo "SQL Server is up"; break
+            fi
+            echo "Waiting for SQL Server... ($i)"
+            sleep 5
+          done
+          # restore DB if missing
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "IF DB_ID('AdventureWorks2014') IS NULL RESTORE DATABASE AdventureWorks2014 FROM DISK = '/tmp/AdventureWorks2014.bak' WITH MOVE 'AdventureWorks2014_Data' TO '/var/opt/mssql/data/AdventureWorks2014.mdf', MOVE 'AdventureWorks2014_Log' TO '/var/opt/mssql/data/AdventureWorks2014_log.ldf'"
+          # ensure DB is online
+          for i in {1..24}; do
+            if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT state_desc FROM sys.databases WHERE name='AdventureWorks2014'" | grep -q ONLINE; then
+              echo "AdventureWorks2014 is online"; break
+            fi
+            echo "Waiting for AdventureWorks2014 to come online... ($i)"
+            sleep 5
+          done
+
+      - name: dbt deps
+        run: |
+          mkdir -p "$DBT_PACKAGES_INSTALL_PATH" "$DBT_TARGET_PATH" "$DBT_LOG_PATH"
+          dbt deps --project-dir dbt --profiles-dir dbt
+
+      - name: dbt run
+        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+
+      - name: dbt test
+        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+
+      - name: Upload dbt logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-logs
+          path: ${{ env.DBT_LOG_PATH }}
