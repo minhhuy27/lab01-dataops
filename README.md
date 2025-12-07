@@ -1,5 +1,8 @@
 # DBT and Airflow Data Pipeline Project
+# DataOps Lab 01
 
+[![CI](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml)
+[![CD](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml)
 ## Project Overview
 This project implements an automated data transformation pipeline using DBT (Data Build Tool) and Apache Airflow. The pipeline extracts data from SQL Server, transforms it using DBT models, and loads it into a target database, following modern data engineering best practices.
 

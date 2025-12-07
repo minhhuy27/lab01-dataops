@@ -23,6 +23,8 @@ jobs:
       DBT_SQLSERVER_DATABASE: AdventureWorks2014
       DBT_SQLSERVER_SCHEMA: dbo
       DBT_SQLSERVER_DRIVER: "ODBC Driver 18 for SQL Server"
+    outputs:
+      target_name: ${{ steps.env-target.outputs.target_name }}
 
     steps:
       - name: Checkout
@@ -34,6 +36,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.9"
+
+      - name: Determine environment target
+        id: env-target
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            echo "target_name=prod" >> "$GITHUB_OUTPUT"
+            echo "schema=gold" >> "$GITHUB_OUTPUT"
+          else
+            echo "target_name=dev" >> "$GITHUB_OUTPUT"
+            echo "schema=bronze" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Deploy target: ${GITHUB_REF##*/} -> $(cat $GITHUB_OUTPUT)"
 
       - name: Install system dependencies (ODBC for SQL Server)
         run: |
@@ -53,10 +67,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install dbt-core==1.8.7 dbt-sqlserver==1.8.7
 
-      - name: Bring up SQL Server for dbt
+      - name: Pre-check: DB connectivity and DB existence
         run: |
           docker compose -f docker-compose.yml up -d sqlserver
-          # wait for SQL Server to accept connections
           for i in {1..30}; do
             if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "select 1" >/dev/null 2>&1; then
               echo "SQL Server is up"; break
@@ -64,9 +77,8 @@ jobs:
             echo "Waiting for SQL Server... ($i)"
             sleep 5
           done
-          # restore DB if missing
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT name FROM sys.databases WHERE name='AdventureWorks2014'"
           docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "IF DB_ID('AdventureWorks2014') IS NULL RESTORE DATABASE AdventureWorks2014 FROM DISK = '/tmp/AdventureWorks2014.bak' WITH MOVE 'AdventureWorks2014_Data' TO '/var/opt/mssql/data/AdventureWorks2014.mdf', MOVE 'AdventureWorks2014_Log' TO '/var/opt/mssql/data/AdventureWorks2014_log.ldf'"
-          # ensure DB is online
           for i in {1..24}; do
             if docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT state_desc FROM sys.databases WHERE name='AdventureWorks2014'" | grep -q ONLINE; then
               echo "AdventureWorks2014 is online"; break
@@ -81,10 +93,14 @@ jobs:
           dbt deps --project-dir dbt --profiles-dir dbt
 
       - name: dbt run
-        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env-target.outputs.target_name }}
 
       - name: dbt test
-        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env-target.outputs.target_name }}
+
+      - name: Post-check: basic health query
+        run: |
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT TOP 1 name, create_date FROM sys.tables ORDER BY create_date DESC"
 
       - name: Upload dbt logs
         if: always()
@@ -92,3 +108,21 @@ jobs:
         with:
           name: dbt-logs
           path: ${{ env.DBT_LOG_PATH }}
+
+      - name: Upload manifest for rollback reference
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-manifest-${{ steps.env-target.outputs.target_name }}
+          path: |
+            ${{ env.DBT_TARGET_PATH }}/manifest.json
+            ${{ env.DBT_TARGET_PATH }}/run_results.json
+
+      - name: Notify (GitHub summary)
+        if: always()
+        run: |
+          echo "## CD Result" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: $GITHUB_REF" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: ${{ steps.env-target.outputs.target_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Logs artifact: dbt-logs" >> $GITHUB_STEP_SUMMARY
