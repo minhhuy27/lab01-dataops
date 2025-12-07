@@ -1,9 +1,9 @@
 with product as (
     select * from {{ source('adventureworks_production', 'Product') }}
-), product_subcategory as (
+),
+product_subcategory as (
     select * from {{ source('adventureworks_production', 'ProductSubcategory') }}
 )
-
 
 select
     p.ProductID as product_id,
