@@ -20,6 +20,7 @@ jobs:
       DBT_PACKAGES_INSTALL_PATH: /tmp/dbt_packages_cache
       DBT_TARGET_PATH: /tmp/dbt_target
       DBT_LOG_PATH: /tmp/dbt_logs
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       DBT_SQLSERVER_HOST: localhost
       DBT_SQLSERVER_USER: SA
       DBT_SQLSERVER_PASSWORD: YourStrong@Passw0rd
@@ -149,3 +150,39 @@ jobs:
               commit_sha: context.sha,
               body
             });
+
+      - name: "Notify Slack"
+        if: always() && env.SLACK_WEBHOOK_URL != ''
+        continue-on-error: true
+        run: |
+          STATUS="${{ job.status }}"
+          TARGET="${{ steps.env_target.outputs.target_name }}"
+          COLOR="danger"
+          if [[ "$STATUS" == "success" ]]; then COLOR="good"; fi
+          payload=$(cat <<EOF
+          {
+            "text": "*CD ${GITHUB_REF##*/}* - target: ${TARGET}, status: ${STATUS}",
+            "attachments": [
+              {
+                "color": "${COLOR}",
+                "fields": [
+                  {"title": "Repo", "value": "${GITHUB_REPOSITORY}", "short": true},
+                  {"title": "Branch", "value": "${GITHUB_REF##*/}", "short": true},
+                  {"title": "Target", "value": "${TARGET}", "short": true},
+                  {"title": "Status", "value": "${STATUS}", "short": true}
+                ]
+              }
+            ]
+          }
+          EOF
+          )
+          curl -X POST -H 'Content-type: application/json' --data "$payload" "$SLACK_WEBHOOK_URL"
+
+      - name: "Rollback (manual)"
+        if: always() && env.ROLLBACK == 'true'
+        run: |
+          echo "Rollback requested (ROLLBACK=true). Restoring AdventureWorks2014 from backup..."
+          docker compose -f docker-compose.yml up -d sqlserver
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "RESTORE DATABASE AdventureWorks2014 FROM DISK = '/tmp/AdventureWorks2014.bak' WITH REPLACE, MOVE 'AdventureWorks2014_Data' TO '/var/opt/mssql/data/AdventureWorks2014.mdf', MOVE 'AdventureWorks2014_Log' TO '/var/opt/mssql/data/AdventureWorks2014_log.ldf'"
+        env:
+          ROLLBACK: ${{ github.event.inputs.rollback || 'false' }}
