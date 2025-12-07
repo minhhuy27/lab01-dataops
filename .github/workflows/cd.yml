@@ -11,6 +11,9 @@ concurrency:
 
 jobs:
   deploy:
+    defaults:
+      run:
+        shell: bash
     runs-on: ubuntu-latest
     env:
       DBT_PROFILES_DIR: dbt
@@ -24,7 +27,7 @@ jobs:
       DBT_SQLSERVER_SCHEMA: dbo
       DBT_SQLSERVER_DRIVER: "ODBC Driver 18 for SQL Server"
     outputs:
-      target_name: ${{ steps.env-target.outputs.target_name }}
+      target_name: ${{ steps.env_target.outputs.target_name }}
 
     steps:
       - name: Checkout
@@ -38,7 +41,7 @@ jobs:
           python-version: "3.9"
 
       - name: Determine environment target
-        id: env-target
+        id: env_target
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
             echo "target_name=prod" >> "$GITHUB_OUTPUT"
@@ -93,10 +96,10 @@ jobs:
           dbt deps --project-dir dbt --profiles-dir dbt
 
       - name: dbt run
-        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env-target.outputs.target_name }}
+        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env_target.outputs.target_name }}
 
       - name: dbt test
-        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env-target.outputs.target_name }}
+        run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env_target.outputs.target_name }}
 
       - name: Post-check: basic health query
         run: |
@@ -113,7 +116,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dbt-manifest-${{ steps.env-target.outputs.target_name }}
+          name: dbt-manifest-${{ steps.env_target.outputs.target_name }}
           path: |
             ${{ env.DBT_TARGET_PATH }}/manifest.json
             ${{ env.DBT_TARGET_PATH }}/run_results.json
@@ -123,6 +126,6 @@ jobs:
         run: |
           echo "## CD Result" >> $GITHUB_STEP_SUMMARY
           echo "- Branch: $GITHUB_REF" >> $GITHUB_STEP_SUMMARY
-          echo "- Target: ${{ steps.env-target.outputs.target_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Target: ${{ steps.env_target.outputs.target_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- Logs artifact: dbt-logs" >> $GITHUB_STEP_SUMMARY
