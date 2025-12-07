@@ -137,6 +137,9 @@ jobs:
       - name: dbt compile
         run: dbt compile --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
 
+      - name: dbt run
+        run: dbt run --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
+
       - name: dbt test
         run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
 
