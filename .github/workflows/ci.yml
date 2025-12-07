@@ -144,10 +144,10 @@ jobs:
         run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
 
       - name: Generate dbt docs
-        run: dbt docs generate --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --docs-directory /tmp/dbt_docs
+        run: dbt docs generate --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH"
 
       - name: Upload dbt docs artifact
         uses: actions/upload-artifact@v4
         with:
           name: dbt-docs
-          path: /tmp/dbt_docs
+          path: ${{ env.DBT_TARGET_PATH }}
