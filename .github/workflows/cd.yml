@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.9"
 
-      - name: Determine environment target
+      - name: "Determine environment target"
         id: env_target
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
@@ -52,7 +52,7 @@ jobs:
           fi
           echo "Deploy target: ${GITHUB_REF##*/} -> $(cat $GITHUB_OUTPUT)"
 
-      - name: Install system dependencies (ODBC for SQL Server)
+      - name: "Install system dependencies (ODBC for SQL Server)"
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends curl ca-certificates gnupg lsb-release unixodbc unixodbc-dev
@@ -65,12 +65,12 @@ jobs:
           sudo apt-get update
           sudo ACCEPT_EULA=Y DEBIAN_FRONTEND=noninteractive apt-get install -y msodbcsql18
 
-      - name: Install Python dependencies
+      - name: "Install Python dependencies"
         run: |
           python -m pip install --upgrade pip
           pip install dbt-core==1.8.7 dbt-sqlserver==1.8.7
 
-      - name: Pre-check: DB connectivity and DB existence
+      - name: "Pre-check: DB connectivity and DB existence"
         run: |
           docker compose -f docker-compose.yml up -d sqlserver
           for i in {1..30}; do
@@ -101,7 +101,7 @@ jobs:
       - name: dbt test
         run: dbt test --project-dir dbt --profiles-dir dbt --target-path "$DBT_TARGET_PATH" --target ${{ steps.env_target.outputs.target_name }}
 
-      - name: Post-check: basic health query
+      - name: "Post-check: basic health query"
         run: |
           docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT TOP 1 name, create_date FROM sys.tables ORDER BY create_date DESC"
 
@@ -112,7 +112,7 @@ jobs:
           name: dbt-logs
           path: ${{ env.DBT_LOG_PATH }}
 
-      - name: Upload manifest for rollback reference
+      - name: "Upload manifest for rollback reference"
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +121,7 @@ jobs:
             ${{ env.DBT_TARGET_PATH }}/manifest.json
             ${{ env.DBT_TARGET_PATH }}/run_results.json
 
-      - name: Notify (GitHub summary)
+      - name: "Notify (GitHub summary)"
         if: always()
         run: |
           echo "## CD Result" >> $GITHUB_STEP_SUMMARY
