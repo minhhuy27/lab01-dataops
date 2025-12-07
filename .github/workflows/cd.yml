@@ -45,11 +45,12 @@ jobs:
         run: |
           if [[ "${GITHUB_REF##*/}" == "main" ]]; then
             echo "target_name=prod" >> "$GITHUB_OUTPUT"
-            echo "schema=gold" >> "$GITHUB_OUTPUT"
+            echo "schema=dbt_prod" >> "$GITHUB_OUTPUT"
           else
             echo "target_name=dev" >> "$GITHUB_OUTPUT"
-            echo "schema=bronze" >> "$GITHUB_OUTPUT"
+            echo "schema=dbt_dev" >> "$GITHUB_OUTPUT"
           fi
+          echo "DBT_SQLSERVER_SCHEMA=${schema}" >> "$GITHUB_ENV"
           echo "Deploy target: ${GITHUB_REF##*/} -> $(cat $GITHUB_OUTPUT)"
 
       - name: "Install system dependencies (ODBC for SQL Server)"
@@ -89,6 +90,8 @@ jobs:
             echo "Waiting for AdventureWorks2014 to come online... ($i)"
             sleep 5
           done
+          # ensure target schema exists
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "IF NOT EXISTS (SELECT * FROM sys.schemas WHERE name = '${DBT_SQLSERVER_SCHEMA}') EXEC('CREATE SCHEMA [${DBT_SQLSERVER_SCHEMA}]')"
 
       - name: dbt deps
         run: |
@@ -104,6 +107,7 @@ jobs:
       - name: "Post-check: basic health query"
         run: |
           docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT TOP 1 name, create_date FROM sys.tables ORDER BY create_date DESC"
+          docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "SELECT COUNT(*) AS gold_sales_rows FROM AdventureWorks2014.[${DBT_SQLSERVER_SCHEMA}].gld_sales_summary"
 
       - name: Upload dbt logs
         if: always()
@@ -129,3 +133,18 @@ jobs:
           echo "- Target: ${{ steps.env_target.outputs.target_name }}" >> $GITHUB_STEP_SUMMARY
           echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "- Logs artifact: dbt-logs" >> $GITHUB_STEP_SUMMARY
+
+      - name: "Notify commit (GitHub comment)"
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const target = '${{ steps.env_target.outputs.target_name }}';
+            const body = `CD ${status} (target=${target}) on ${context.ref}\nLogs: dbt-logs`;
+            await github.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body
+            });

@@ -3,6 +3,12 @@
 
 [![CI](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml)
 [![CD](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml)
+
+## Triển khai CI/CD
+- CI: lint Python (black/flake8) + lint SQL (sqlfluff), dbt deps/compile/run/test, sinh dbt docs artifact, validate PR (tiêu đề, file size, conflict markers). Trigger PR/push.
+- CD: push main/develop (hoặc dispatch) → dựng SQL Server + restore AdventureWorks nếu thiếu → dbt deps/run/test theo target (dev|prod) → post-check health query → upload log & manifest. Target dev/prod chọn theo branch, schema mặc định `dbt_dev` / `dbt_prod`.
+- Thông báo: kết quả ghi vào GitHub Summary và comment lên commit; artifacts: dbt-logs, dbt-manifest-<target>.
+- Rollback (thủ công): dùng backup AdventureWorks2014 (có restore script trong workflow), hoặc tải artifact manifest/run_results từ run CD trước đó và chạy lại dbt với manifest cũ (hoặc restore DB từ backup SQL Server). 
 ## Project Overview
 This project implements an automated data transformation pipeline using DBT (Data Build Tool) and Apache Airflow. The pipeline extracts data from SQL Server, transforms it using DBT models, and loads it into a target database, following modern data engineering best practices.
 
