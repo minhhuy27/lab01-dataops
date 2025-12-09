@@ -119,6 +119,9 @@ docker-compose.yml
 ## 9. Contributors
 - Cập nhật danh sách thành viên & vai trò. 
 
+-------------------------------------------------------------------------------
+
+# DBT & Airflow Data Pipeline Project
 
 ### Architecture Overview
 ```
