@@ -11,35 +11,35 @@
 ## 2. System Architecture Diagram
 ```mermaid
 flowchart LR
-    subgraph gh[GitHub Actions]
-        ci[CI: lint + dbt deps/compile/run/test]
-        cd[CD: dbt deps/run/test dev & prod]
+    subgraph gh ["GitHub Actions"]
+        ci["CI: lint + dbt deps/compile/run/test"]
+        cd["CD: dbt deps/run/test dev & prod"]
     end
 
-    subgraph docker[Docker Compose]
-        sql[(SQL Server<br/>AdventureWorks2014)]
-        airflow[AIRFLOW<br/>DAG dbt_pipeline]
-        dbtcli[DBT CLI<br/>(container)]
+    subgraph docker ["Docker Compose"]
+        sql["SQL Server<br/>AdventureWorks2014"]
+        airflow["AIRFLOW<br/>DAG dbt_pipeline"]
+        dbtcli["DBT CLI<br/>(container)"]
     end
 
-    ext[AdventureWorks2014 .bak] -->|restore| sql
+    ext["AdventureWorks2014 .bak"] -->|restore| sql
     gh -->|pull code / trigger| docker
     airflow -->|triggers| dbtcli
     ci -->|spin up sqlserver| sql
     ci -->|dbt deps/run/test| dbtcli
     cd -->|dbt deps/run/test| dbtcli
 
-    dbtcli -->|bronze models| bronze[(Schema: dbt_dev/dbt_prod<br/>Bronze tables/views)]
-    dbtcli -->|silver models| silver[(Schema: dbt_dev/dbt_prod<br/>Silver tables)]
-    dbtcli -->|gold models| gold[(Schema: dbt_dev/dbt_prod<br/>Gold marts)]
+    dbtcli -->|bronze models| bronze["Schema: dbt_dev/dbt_prod<br/>Bronze tables/views"]
+    dbtcli -->|silver models| silver["Schema: dbt_dev/dbt_prod<br/>Silver tables"]
+    dbtcli -->|gold models| gold["Schema: dbt_dev/dbt_prod<br/>Gold marts"]
 
     sql <-->|source tables| bronze
     bronze --> silver --> gold
 
-    subgraph artifacts[Artifacts]
-        docs[dbt docs]
-        logs[dbt logs]
-        manifests[manifest.json<br/>run_results.json]
+    subgraph artifacts ["Artifacts"]
+        docs["dbt docs"]
+        logs["dbt logs"]
+        manifests["manifest.json<br/>run_results.json"]
     end
 
     dbtcli --> docs
