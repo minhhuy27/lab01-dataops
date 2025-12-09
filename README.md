@@ -1,82 +1,124 @@
-# DBT and Airflow Data Pipeline Project
+# DBT & Airflow DataOps Pipeline Project
 # DataOps Lab 01
-
 [![CI](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/ci.yml)
 [![CD](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml/badge.svg)](https://github.com/minhhuy27/lab01-dataops/actions/workflows/cd.yml)
 
-## Triển khai CI/CD
-- CI: lint Python (black/flake8) + lint SQL (sqlfluff), dbt deps/compile/run/test, sinh dbt docs artifact, validate PR (tiêu đề, file size, conflict markers). Trigger PR/push.
-- CD: push main/develop (hoặc dispatch) → dựng SQL Server + restore AdventureWorks nếu thiếu → dbt deps/run/test theo target (dev|prod) → post-check health query → upload log & manifest. Target dev/prod chọn theo branch, schema mặc định `dbt_dev` / `dbt_prod`.
-- Thông báo: kết quả ghi vào GitHub Summary và comment lên commit; artifacts: dbt-logs, dbt-manifest-<target>.
-- Rollback (thủ công): dùng backup AdventureWorks2014 (có restore script trong workflow), hoặc tải artifact manifest/run_results từ run CD trước đó và chạy lại dbt với manifest cũ (hoặc restore DB từ backup SQL Server). 
+## 1. Project Overview
+- Mục tiêu: Xây dựng pipeline DataOps trên AdventureWorks2014 với dbt (bronze → silver → gold), orchestration bằng Airflow, đóng gói Docker, CI/CD GitHub Actions.
+- Thành phần: SQL Server (AdventureWorks2014), dbt (models + tests), Airflow DAG `dbt_pipeline`, Docker Compose, GitHub Actions (CI/CD), Postgres cho metadata Airflow.
+- Luồng dữ liệu: SQL Server (raw) → dbt bronze → dbt silver → dbt gold; Airflow gọi dbt deps/run/test; CI/CD tự động lint + chạy dbt khi push/merge.
 
-# Giới thiệu dự án
-Pipeline DataOps triển khai ETL/ELT với DBT trên SQL Server (AdventureWorks2014), orchestration bằng Airflow, đóng gói qua Docker Compose. CI/CD dùng GitHub Actions để lint, kiểm thử DBT và tự động chạy pipeline khi merge vào `develop`/`main`.
+## 2. System Architecture Diagram
+```mermaid
+flowchart LR
+    subgraph gh[GitHub Actions]
+        ci[CI: lint + dbt deps/compile/run/test]
+        cd[CD: dbt deps/run/test dev & prod]
+    end
 
-## Kiến trúc ngắn gọn
-- **Nguồn dữ liệu**: SQL Server + AdventureWorks2014 (restore từ .bak).
-- **DBT**: models bronze/silver/gold, tests schema + custom, freshness.
-- **Airflow**: DAG `dbt_pipeline` chạy deps → bronze → silver → gold → test, schedule hằng ngày.
-- **CI/CD**: workflow `ci.yml` (lint + dbt run/test) và `cd.yml` (deploy dev/prod, health check, artifacts).
+    subgraph docker[Docker Compose]
+        sql[(SQL Server<br/>AdventureWorks2014)]
+        airflow[AIRFLOW<br/>DAG dbt_pipeline]
+        dbtcli[DBT CLI<br/>(container)]
+    end
 
-## Yêu cầu môi trường
+    ext[AdventureWorks2014 .bak] -->|restore| sql
+    gh -->|pull code / trigger| docker
+    airflow -->|triggers| dbtcli
+    ci -->|spin up sqlserver| sql
+    ci -->|dbt deps/run/test| dbtcli
+    cd -->|dbt deps/run/test| dbtcli
+
+    dbtcli -->|bronze models| bronze[(Schema: dbt_dev/dbt_prod<br/>Bronze tables/views)]
+    dbtcli -->|silver models| silver[(Schema: dbt_dev/dbt_prod<br/>Silver tables)]
+    dbtcli -->|gold models| gold[(Schema: dbt_dev/dbt_prod<br/>Gold marts)]
+
+    sql <-->|source tables| bronze
+    bronze --> silver --> gold
+
+    subgraph artifacts[Artifacts]
+        docs[dbt docs]
+        logs[dbt logs]
+        manifests[manifest.json<br/>run_results.json]
+    end
+
+    dbtcli --> docs
+    dbtcli --> logs
+    dbtcli --> manifests
+    gh -->|upload| artifacts
+```
+
+## 3. Folder Structure
+```
+/dbt
+  /models/bronze
+  /models/silver
+  /models/gold
+  profiles.yml, packages.yml, dbt_project.yml
+/airflow
+  /dags (dbt_pipeline)
+  /logs (ignored), Dockerfile
+/.github/workflows (ci.yml, cd.yml)
+docker-compose.yml
+```
+
+## 4. Prerequisites
 - Docker & Docker Compose.
 - Python 3.9 (nếu muốn chạy dbt/linters ngoài container).
-- Trên Windows: chạy PowerShell/WSL; cổng 1433 (SQL Server) và 8080 (Airflow) trống.
+- Ports trống: 1433 (SQL Server), 8080 (Airflow).
+- Env tùy chọn: `DBT_SQLSERVER_HOST/USER/PASSWORD/DATABASE/SCHEMA/DRIVER`, `SLACK_WEBHOOK_URL` (thông báo CD).
 
-## Hướng dẫn thiết lập & chạy cục bộ
+## 5. Setup Guide (≤30 phút)
 1) Clone repo:
    ```bash
    git clone <repo>
    cd lab01-dataops
    ```
-2) Khởi động stack (SQL Server, Airflow, dbt container):
+2) (Tuỳ chọn) tạo .env cho biến SQL/Slack.
+3) Chạy Docker:
    ```bash
    docker compose up -d
    ```
-   Lần đầu, SQL Server sẽ tải và restore AdventureWorks2014.
-3) Chạy DBT trong container:
-   ```bash
-   # Cài package (nếu cần)
-   docker compose exec dbt dbt deps
-   # Chạy models
-   docker compose exec dbt dbt run --select bronze silver gold
-   # Chạy tests
-   docker compose exec dbt dbt test --select bronze silver gold
-   ```
-4) Airflow UI:
-   - Mở http://localhost:8080 (user/pass: admin/admin theo docker-compose).
-   - Bật DAG `dbt_pipeline`, có thể trigger thủ công.
-   - Logs lưu tại `airflow/logs`.
+   SQL Server sẽ tải & restore AdventureWorks2014.
+4) Kiểm tra services:
+   - Airflow UI: http://localhost:8080 (admin/admin).
+   - SQL Server: localhost:1433 (SA/YourStrong@Passw0rd).
+   - dbt container: `docker compose exec dbt sh`.
 
-## Cấu hình DBT (profiles.yml)
-- Mặc định profile `dbt_airflow_project` dùng SQL Server trong Docker (`server=sqlserver`, user `SA`).
-- Override qua biến môi trường: `DBT_SQLSERVER_HOST`, `DBT_SQLSERVER_USER`, `DBT_SQLSERVER_PASSWORD`, `DBT_SQLSERVER_DATABASE`, `DBT_SQLSERVER_SCHEMA`, `DBT_SQLSERVER_DRIVER` (đã dùng driver 18).
+## 6. Running the Pipeline
+- Airflow:
+  - Bật DAG `dbt_pipeline`, trigger tay trong UI.
+  - Xem log trong Airflow UI hoặc `airflow/logs`.
+- dbt (trong container):
+  ```bash
+  docker compose exec dbt dbt deps
+  docker compose exec dbt dbt run --select bronze silver gold
+  docker compose exec dbt dbt test --select bronze silver gold
+  docker compose exec dbt dbt docs generate
+  # phục vụ docs local (tùy chọn):
+  # docker compose exec dbt dbt docs serve --port 8001
+  ```
 
-## CI/CD chi tiết
-- **CI (`.github/workflows/ci.yml`)**
-  - Lint: black/flake8, sqlfluff.
-  - dbt deps → compile → run → test trên SQL Server trong workflow.
-  - Generate dbt docs, upload artifact.
-  - Validate PR title (conventional commits), file >1MB, conflict markers.
-- **CD (`.github/workflows/cd.yml`)**
-  - Trigger: push `main` (target=prod, schema=`dbt_prod`), push `develop` (target=dev, schema=`dbt_dev`), hoặc dispatch.
-  - Bước: dựng SQL Server, restore DB nếu thiếu, tạo schema, dbt deps → run → test, health query, upload logs/manifest.
-  - Thông báo: GitHub summary; commit comment (bỏ qua nếu không đủ quyền); Slack webhook nếu `SLACK_WEBHOOK_URL` có trong secrets.
-  - Rollback thủ công: set input `rollback=true` (dispatch) để restore AdventureWorks từ backup; hoặc tự restore qua docker compose exec sqlcmd.
+## 7. CI/CD Documentation
+- CI (`ci.yml`):
+  - Lint Python (black/flake8), lint SQL (sqlfluff).
+  - dbt deps → compile → run → test; gen dbt docs artifact.
+  - PR validation: tiêu đề, file >1MB, conflict markers.
+- CD (`cd.yml`):
+  - Trigger: push main (target=prod, schema=dbt_prod) / develop (target=dev, schema=dbt_dev) / dispatch.
+  - Bước: dựng SQL Server, restore DB nếu thiếu, tạo schema, dbt deps/run/test, health query, upload logs/manifest.
+  - Thông báo: GitHub summary; commit comment (bỏ qua nếu không đủ quyền); Slack nếu có `SLACK_WEBHOOK_URL`.
+  - Rollback thủ công: đặt input `rollback=true` khi dispatch hoặc tự restore .bak qua sqlcmd.
 
-## Rollback hướng dẫn nhanh (thủ công)
-```bash
-docker compose up -d sqlserver
-docker compose exec sqlserver /opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P YourStrong@Passw0rd -Q "RESTORE DATABASE AdventureWorks2014 FROM DISK = '/tmp/AdventureWorks2014.bak' WITH REPLACE, MOVE 'AdventureWorks2014_Data' TO '/var/opt/mssql/data/AdventureWorks2014.mdf', MOVE 'AdventureWorks2014_Log' TO '/var/opt/mssql/data/AdventureWorks2014_log.ldf'"
-```
+## 8. Troubleshooting
+- Không kết nối SQL Server: `docker compose logs sqlserver`; kiểm tra port 1433, SA password.
+- Airflow scheduler không chạy: `docker compose logs airflow-scheduler`; đảm bảo DB init xong.
+- dbt profile lỗi driver: rebuild image `dbt` (có ODBC 18) bằng `docker compose build dbt`.
+- GitHub Actions lỗi ODBC/SQL: xem step install driver & restore DB trong log CI/CD; runner cần quyền Docker.
 
-## Troubleshooting nhanh
-- Không kết nối được SQL Server: kiểm tra `docker compose ps`, xem log `docker compose logs sqlserver`.
-- DBT báo thiếu driver: rebuild image `dbt` (đã cài ODBC 18) bằng `docker compose build dbt`.
-- Airflow không thấy DAG: đảm bảo volume `./airflow/dags` mount và container airflow đang chạy.
-## Project Overview
-This project implements an automated data transformation pipeline using DBT (Data Build Tool) and Apache Airflow. The pipeline extracts data from SQL Server, transforms it using DBT models, and loads it into a target database, following modern data engineering best practices.
+## 9. Contributors
+- Cập nhật danh sách thành viên & vai trò. 
+
 
 ### Architecture Overview
 ```
